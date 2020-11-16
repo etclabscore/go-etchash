@@ -1,0 +1,46 @@
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+/tmp
+*/**/*un~
+*/**/*.test
+*un~
+.DS_Store
+*/**/.DS_Store
+*/**/*tx_database*
+*/**/*dapps*
+build/_vendor/pkg
+
+#*
+.#*
+*#
+*~
+.project
+.settings
+
+# used by the Makefile
+/build/_workspace/
+/build/bin/
+/*.zip
+
+# travis
+profile.tmp
+profile.cov
+
+# IdeaIDE
+.idea
+
+# VS Code
+.vscode

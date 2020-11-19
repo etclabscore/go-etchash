@@ -2,6 +2,9 @@
 
 Etchash go module intended for use by open-etc-pool (and open-ethereum-pool).
 
+* for open-etc-pool see https://github.com/etclabscore/open-etc-pool
+* for more information on etchash see https://github.com/eth-classic/etchash
+
 ### usage
 
 ```go

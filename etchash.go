@@ -36,6 +36,7 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
+	"bytes"
 
 	mmap "github.com/edsrzf/mmap-go"
 	"github.com/ethereum/go-ethereum/common"
@@ -755,7 +756,7 @@ func NewForTesting(ecip1099FBlock *uint64) (*Etchash, error) {
 }
 
 // added for NiceHash GetShareDiff
-func (l *Light) computeMixDigest(blockNum uint64, hashNoNonce common.Hash, nonce uint64) (ok bool, mixDigest common.Hash, result common.Hash) {
+func (l *Light) computeMixDigest(blockNum uint64, hashNoNonce common.Hash, nonce uint64) (mixDigest common.Hash, result common.Hash) {
 	epochLength := calcEpochLength(blockNum, l.ecip1099FBlock)
 	epoch := calcEpoch(blockNum, epochLength)
 	dagSize := datasetSize(epoch)

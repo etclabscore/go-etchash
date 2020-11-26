@@ -36,7 +36,6 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
-	"bytes"
 
 	mmap "github.com/edsrzf/mmap-go"
 	"github.com/ethereum/go-ethereum/common"

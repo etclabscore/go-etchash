@@ -763,6 +763,6 @@ func (l *Light) computeMixDigest(blockNum uint64, hashNoNonce common.Hash, nonce
 	return cache.compute(uint64(dagSize), hashNoNonce, nonce)
 }
 
-func (l *Light) GetShareDiff(blockNum uint64, headerHash common.Hash, nonce uint64) (mixDigest common.Hash, result common.Hash) {
+func (l *Light) Compute(blockNum uint64, headerHash common.Hash, nonce uint64) (mixDigest common.Hash, result common.Hash) {
 	return l.computeMixDigest(blockNum, headerHash, nonce)
 }

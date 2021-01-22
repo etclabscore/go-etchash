@@ -208,9 +208,11 @@ func generateCache(dest []uint32, epoch uint64, epochLength uint64, uip1Epoch *u
 	// Create a hasher to reuse between invocations
 	keccak512 := makeHasher(sha3.NewLegacyKeccak512())
 	// uip1 - (ubqhash)
-	if epoch >= *uip1Epoch {
-		h, _ := blake2b.New512(nil)
-		keccak512 = blakeHasher(h) // use blakeHasher instead of makeHasher here.
+	if uip1Epoch != nil {
+		if epoch >= *uip1Epoch {
+			h, _ := blake2b.New512(nil)
+			keccak512 = blakeHasher(h) // use blakeHasher instead of makeHasher here.
+		}
 	}
 
 	// Sequentially produce the initial dataset

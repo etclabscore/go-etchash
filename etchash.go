@@ -272,6 +272,7 @@ func (lru *lru) get(epoch uint64, epochLength uint64, ecip1099FBlock *uint64) (i
 type cache struct {
 	epoch       uint64    // Epoch for which this cache is relevant
 	epochLength uint64    // Epoch length (ECIP-1099)
+	uip1Epoch   *uint64   // Epoch for UIP-1 activation
 	dump        *os.File  // File descriptor of the memory mapped cache
 	mmap        mmap.MMap // Memory map itself to unmap before releasing
 	cache       []uint32  // The actual cache data content (may be memory mapped)
@@ -324,8 +325,8 @@ func isBadCache(epoch uint64, epochLength uint64, data []uint32) (bool, string) 
 
 // newCache creates a new etchash verification cache and returns it as a plain Go
 // interface to be usable in an LRU cache.
-func newCache(epoch uint64, epochLength uint64) interface{} {
-	return &cache{epoch: epoch, epochLength: epochLength}
+func newCache(epoch uint64, epochLength uint64, uip1Epoch *uint64) interface{} {
+	return &cache{epoch: epoch, epochLength: epochLength, uip1Epoch: uip1Epoch}
 }
 
 // generate ensures that the cache content is generated before use.
@@ -339,7 +340,7 @@ func (c *cache) generate(dir string, limit int, lock bool, test bool) {
 		// If we don't store anything on disk, generate and return.
 		if dir == "" {
 			c.cache = make([]uint32, size/4)
-			generateCache(c.cache, c.epoch, c.epochLength, seed)
+			generateCache(c.cache, c.epoch, c.epochLength, c.uip1Epoch, seed)
 			return
 		}
 		// Disk storage is needed, this will get fancy
@@ -370,12 +371,12 @@ func (c *cache) generate(dir string, limit int, lock bool, test bool) {
 		logger.Debug("Failed to load old etchash cache", "err", err)
 
 		// No usable previous cache available, create a new cache file to fill
-		c.dump, c.mmap, c.cache, err = memoryMapAndGenerate(path, size, lock, func(buffer []uint32) { generateCache(buffer, c.epoch, c.epochLength, seed) })
+		c.dump, c.mmap, c.cache, err = memoryMapAndGenerate(path, size, lock, func(buffer []uint32) { generateCache(buffer, c.epoch, c.epochLength, c.uip1Epoch, seed) })
 		if err != nil {
 			logger.Error("Failed to generate mapped etchash cache", "err", err)
 
 			c.cache = make([]uint32, size/4)
-			generateCache(c.cache, c.epoch, c.epochLength, seed)
+			generateCache(c.cache, c.epoch, c.epochLength, c.uip1Epoch, seed)
 		}
 		// Iterate over all previous instances and delete old ones
 		for ep := int(c.epoch) - limit; ep >= 0; ep-- {
@@ -415,6 +416,7 @@ type Light struct {
 
 	NumCaches      int // Maximum number of caches to keep before eviction (only init, don't modify)
 	ecip1099FBlock *uint64
+	uip1Epoch      *uint64
 }
 
 // Verify checks whether the block's nonce is valid.
@@ -457,6 +459,16 @@ func (l *Light) Verify(block Block) bool {
 	// The actual check.
 	target := new(big.Int).Div(maxUint256, difficulty)
 	return result.Big().Cmp(target) <= 0
+}
+
+// compute() to get mixhash and result
+func (l *Light) Compute(blockNum uint64, hashNoNonce common.Hash, nonce uint64) (mixDigest common.Hash, result common.Hash) {
+	epochLength := calcEpochLength(blockNum, l.ecip1099FBlock)
+	epoch := calcEpoch(blockNum, epochLength)
+
+	cache := l.getCache(blockNum)
+	dagSize := datasetSize(epoch)
+	return cache.compute(uint64(dagSize), hashNoNonce, nonce)
 }
 
 func (l *Light) getCache(blockNum uint64) *cache {
@@ -522,6 +534,7 @@ func (l *Light) getCache(blockNum uint64) *cache {
 type dataset struct {
 	epoch       uint64    // Epoch for which this cache is relevant
 	epochLength uint64    // Epoch length (ECIP-1099)
+	uip1Epoch   *uint64   // Epoch for UIP-1 activation
 	dump        *os.File  // File descriptor of the memory mapped cache
 	mmap        mmap.MMap // Memory map itself to unmap before releasing
 	dataset     []uint32  // The actual cache data content
@@ -532,8 +545,8 @@ type dataset struct {
 
 // newDataset creates a new etchash mining dataset and returns it as a plain Go
 // interface to be usable in an LRU cache.
-func newDataset(epoch uint64, epochLength uint64) interface{} {
-	return &dataset{epoch: epoch, epochLength: epochLength}
+func newDataset(epoch uint64, epochLength uint64, uip1Epoch *uint64) interface{} {
+	return &dataset{epoch: epoch, epochLength: epochLength, uip1Epoch: uip1Epoch}
 }
 
 // generate ensures that the dataset content is generated before use.
@@ -552,7 +565,7 @@ func (d *dataset) generate(dir string, limit int, lock bool, test bool) {
 		// If we don't store anything on disk, generate and return
 		if dir == "" {
 			cache := make([]uint32, csize/4)
-			generateCache(cache, d.epoch, d.epochLength, seed)
+			generateCache(cache, d.epoch, d.epochLength, d.uip1Epoch, seed)
 
 			d.dataset = make([]uint32, dsize/4)
 			generateDataset(d.dataset, d.epoch, d.epochLength, cache)
@@ -591,7 +604,7 @@ func (d *dataset) generate(dir string, limit int, lock bool, test bool) {
 
 		// No usable previous dataset available, create a new dataset file to fill
 		cache := make([]uint32, csize/4)
-		generateCache(cache, d.epoch, d.epochLength, seed)
+		generateCache(cache, d.epoch, d.epochLength, d.uip1Epoch, seed)
 
 		d.dump, d.mmap, d.dataset, err = memoryMapAndGenerate(path, dsize, lock, func(buffer []uint32) { generateDataset(buffer, d.epoch, d.epochLength, cache) })
 		if err != nil {
@@ -643,6 +656,7 @@ type Full struct {
 	mu             sync.Mutex // protects dag
 	current        *dataset   // current full DAG
 	ecip1099FBlock *uint64
+	uip1Epoch      *uint64
 }
 
 func (pow *Full) getDAG(blockNum uint64) (d *dataset) {
@@ -728,16 +742,17 @@ type Etchash struct {
 }
 
 // New creates an instance of the proof of work.
-func New(ecip1099FBlock *uint64) *Etchash {
+func New(ecip1099FBlock *uint64, uip1FEpoch *uint64) *Etchash {
 	var light = new(Light)
 	light.ecip1099FBlock = ecip1099FBlock
-	return &Etchash{light, &Full{turbo: true, ecip1099FBlock: ecip1099FBlock}}
+	light.uip1Epoch = uip1FEpoch
+	return &Etchash{light, &Full{turbo: true, ecip1099FBlock: ecip1099FBlock, uip1Epoch: uip1FEpoch}}
 }
 
 // NewShared creates an instance of the proof of work., where a single instance
 // of the Light cache is shared across all instances created with NewShared.
-func NewShared(ecip1099FBlock *uint64) *Etchash {
-	return &Etchash{sharedLight, &Full{turbo: true}}
+func NewShared(ecip1099FBlock *uint64, uip1FEpoch *uint64) *Etchash {
+	return &Etchash{sharedLight, &Full{turbo: true, ecip1099FBlock: ecip1099FBlock, uip1Epoch: uip1FEpoch}}
 }
 
 // NewForTesting creates a proof of work for use in unit tests.
@@ -746,7 +761,7 @@ func NewShared(ecip1099FBlock *uint64) *Etchash {
 //
 // Nonces found by a testing instance are not verifiable with a
 // regular-size cache.
-func NewForTesting(ecip1099FBlock *uint64) (*Etchash, error) {
+func NewForTesting(ecip1099FBlock *uint64, uip1FEpoch *uint64) (*Etchash, error) {
 	dir, err := ioutil.TempDir("", "etchash-test")
 	if err != nil {
 		return nil, err

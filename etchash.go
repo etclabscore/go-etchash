@@ -510,9 +510,12 @@ func (l *Light) getCache(blockNum uint64) *cache {
 		var nextEpoch = epoch + 1
 		var nextEpochLength = epochLength
 		var nextEpochBlock = nextEpoch * epochLength
-		if nextEpochBlock == *l.ecip1099FBlock && epochLength == epochLengthDefault {
-			nextEpoch = nextEpoch / 2
-			nextEpochLength = epochLengthECIP1099
+
+		if l.ecip1099FBlock != nil {
+			if nextEpochBlock == *l.ecip1099FBlock && epochLength == epochLengthDefault {
+				nextEpoch = nextEpoch / 2
+				nextEpochLength = epochLengthECIP1099
+			}
 		}
 
 		// If we just used up the future cache, or need a refresh, regenerate

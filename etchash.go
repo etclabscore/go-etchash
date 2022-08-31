@@ -259,7 +259,7 @@ func (lru *lru) get(epoch uint64, epochLength uint64, ecip1099FBlock *uint64) (i
 	}
 
 	// Update the 'future item' if epoch is larger than previously seen.
-	if epoch < maxEpoch-1 && lru.future < nextEpoch {
+	if epoch < maxEpoch-1 && lru.future != nextEpoch {
 		log.Trace("Requiring new future etchash "+lru.what, "epoch", nextEpoch)
 		future = lru.new(nextEpoch, nextEpochLength)
 		lru.future = nextEpoch
@@ -533,7 +533,7 @@ func (l *Light) getCache(blockNum uint64) *cache {
 	return c
 }
 
-/// dataset wraps an etchash dataset with some metadata to allow easier concurrent use.
+// dataset wraps an etchash dataset with some metadata to allow easier concurrent use.
 type dataset struct {
 	epoch       uint64    // Epoch for which this cache is relevant
 	epochLength uint64    // Epoch length (ECIP-1099)

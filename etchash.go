@@ -533,7 +533,7 @@ func (l *Light) getCache(blockNum uint64) *cache {
 	return c
 }
 
-// / dataset wraps an etchash dataset with some metadata to allow easier concurrent use.
+// dataset wraps an etchash dataset with some metadata to allow easier concurrent use.
 type dataset struct {
 	epoch       uint64    // Epoch for which this cache is relevant
 	epochLength uint64    // Epoch length (ECIP-1099)
